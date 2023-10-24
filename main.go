@@ -8,17 +8,11 @@ import (
 	"net"
 	"strings"
 	"time"
-	// "log"
-	// "math/rand"
-	// "net"
-	// "strings"
-	// "time"
 )
 
 const RECORD_TYPE_A = 1
 
-// IN = internet
-const CLASS_IN = 1
+const CLASS_IN = 1               // IN = internet
 const RECURSION_DESIRED = 1 << 8 // 100000000 set 9th bit from right
 
 type DNSHeader struct {
@@ -60,12 +54,6 @@ func main() {
 
 	destination := "8.8.8.8:53"
 	queryBytes := buildQuery("www.example.com", RECORD_TYPE_A)
-	// hexString := "3c5f0100000100000000000003777777076578616d706c6503636f6d0000010001"
-
-	// queryBytes, err := hex.DecodeString(hexString)
-	// if err != nil {
-	// 	log.Fatalf("error decoding hex string: %v\n", err)
-	// }
 
 	err := sendQueryWithUDP(queryBytes, destination)
 	if err != nil {
@@ -105,17 +93,15 @@ func sendQueryWithUDP(queryBytes []byte, destination string) error {
 
 func buildQuery(domainName string, recordType int) []byte {
 	name := encodeDNSName(domainName)
-
 	rand.Seed(time.Now().UnixNano())
-	// min := 10
-	// max := 5000
-	// id := rand.Intn(max-min+1) + min
-	id := 0x8298
+	min := 10
+	max := 5000
+	id := rand.Intn(max-min+1) + min
 
 	header := DNSHeader{
 		ID:           id,
 		NumQuestions: 1,
-		Flags:        0,
+		Flags:        RECURSION_DESIRED,
 	}
 
 	question := DNSQuestion{
@@ -125,43 +111,3 @@ func buildQuery(domainName string, recordType int) []byte {
 	}
 	return append(header.toBytes(), question.toBytes()...)
 }
-
-// dnsH := DNSHeader{
-// 	ID:             0x1314,
-// 	Flags:          0,
-// 	NumQuestions:   1,
-// 	NumAnswers:     0,
-// 	NumAuthorities: 0,
-// 	NumAdditionals: 0,
-// }
-
-// b, err := headerToBytes(dnsH)
-// if err != nil {
-// 	log.Fatalf("error converting header to bytes: %v", err)
-// }
-// hexLiteral := bytesToHexLiteral(b)
-
-// fmt.Println(hexLiteral)
-// func bytesToHexLiteral(bytes []byte) string {
-// 	result := "b'"
-// 	for _, b := range bytes {
-// 		result += fmt.Sprintf("\\x%02x", b)
-// 	}
-// 	result += "'"
-// 	return result
-// }
-
-// header := DNSHeader{
-// 	ID:             0x1314,
-// 	Flags:          0,
-// 	NumQuestions:   1,
-// 	NumAnswers:     0,
-// 	NumAuthorities: 0,
-// 	NumAdditionals: 0,
-// }
-// headerBytes := header.toBytes()
-// fmt.Printf("%x", headerBytes)
-
-// domainName := "google.com"
-// encodedDNSName := encodeDNSName(domainName)
-// fmt.Printf("%x\n", encodedDNSName)
