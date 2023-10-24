@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"log"
@@ -11,43 +12,51 @@ import (
 )
 
 const RECORD_TYPE_A = 1
-
 const CLASS_IN = 1               // IN = internet
 const RECURSION_DESIRED = 1 << 8 // 100000000 set 9th bit from right
+const MAX_UINT_16_VAL = 65535
 
 type DNSHeader struct {
-	ID             int
-	Flags          int
-	NumQuestions   int
-	NumAnswers     int
-	NumAuthorities int
-	NumAdditionals int
+	// ID is a 16 bit identifier for a query. A new random ID should be used for each request.
+	ID uint16
+	// Flags specifies the requested operation and a response code.
+	Flags uint16
+	// QuestionCount is an unsigned 16 bit integer specifying the # of entries in the question section (aka. `QDCOUNT`)
+	QuestionCount uint16
+	// AnswerCount is an unsigned 16 bit integer specifying the # of resource records in the answer section (aka. `ANCOUNT`)
+	AnswerCount uint16
+	// AuthorityCount is an unsigned 16 bit integer specifying the # of name server resource records in the authority records section (aka. `NSCOUNT`)
+	AuthorityCount uint16
+	// AdditionalCount is an unsigned 16 bit integer specifying the # of resource records in the additional records section. (aka. `ARCOUNT`)
+	AdditionalCount uint16
 }
 
 func (h *DNSHeader) toBytes() []byte {
-	data := make([]byte, 12)
-	binary.BigEndian.PutUint16(data[0:2], uint16(h.ID))
-	binary.BigEndian.PutUint16(data[2:4], uint16(h.Flags))
-	binary.BigEndian.PutUint16(data[4:6], uint16(h.NumQuestions))
-	binary.BigEndian.PutUint16(data[6:8], uint16(h.NumAnswers))
-	binary.BigEndian.PutUint16(data[8:10], uint16(h.NumAuthorities))
-	binary.BigEndian.PutUint16(data[10:12], uint16(h.NumAdditionals))
-	return data
+	buf := bytes.Buffer{}
+	binary.Write(&buf, binary.BigEndian, h.ID)
+	binary.Write(&buf, binary.BigEndian, h.Flags)
+	binary.Write(&buf, binary.BigEndian, h.QuestionCount)
+	binary.Write(&buf, binary.BigEndian, h.AnswerCount)
+	binary.Write(&buf, binary.BigEndian, h.AuthorityCount)
+	binary.Write(&buf, binary.BigEndian, h.AdditionalCount)
+	return buf.Bytes()
 }
 
 type DNSQuestion struct {
-	Name  []byte // eg. example.com
-	Type  int    // eg. A
-	Class int
+	// Name is the domain name being queried, eg. example.com
+	Name []byte
+	// Type is the type of record being queried, eg. A
+	Type uint16
+	// Class is the class of records being queried
+	Class uint16
 }
 
 func (q *DNSQuestion) toBytes() []byte {
-	data := make([]byte, len(q.Name)+4)
-	copy(data, q.Name)
-
-	binary.BigEndian.PutUint16(data[len(q.Name):len(q.Name)+2], uint16(q.Type))
-	binary.BigEndian.PutUint16(data[len(q.Name)+2:len(q.Name)+4], uint16(q.Class))
-	return data
+	buf := bytes.Buffer{}
+	binary.Write(&buf, binary.BigEndian, q.Name)
+	binary.Write(&buf, binary.BigEndian, q.Type)
+	binary.Write(&buf, binary.BigEndian, q.Class)
+	return buf.Bytes()
 }
 
 func main() {
@@ -62,19 +71,21 @@ func main() {
 	fmt.Println("query sent")
 }
 
+// DNS expects each label (e.g., "www" or "example") to be preceded
+// by a one-byte length field specifying the label's length.
 func encodeDNSName(domainName string) []byte {
-	encoded := []byte{}
-	parts := strings.Split(domainName, ".")
+	buf := bytes.Buffer{}
+	// Splits `www.example.com` to `www`, `example, `com` (also called labels)
+	labels := strings.Split(domainName, ".")
 
-	for _, part := range parts {
-		partBytes := []byte(part)
-		partByteLength := byte(len(partBytes))
-		encoded = append(encoded, partByteLength)
-		encoded = append(encoded, partBytes...)
+	for _, label := range labels {
+		labelByteLength := byte(len(label))
+		buf.WriteByte(labelByteLength)
+		buf.WriteString(label)
 	}
-	// Terminate the DNS name with a null byte
-	encoded = append(encoded, 0)
-	return encoded
+	// Terminate name with a null byte (signals no more labels)
+	buf.WriteByte(0)
+	return buf.Bytes()
 }
 
 func sendQueryWithUDP(queryBytes []byte, destination string) error {
@@ -88,20 +99,19 @@ func sendQueryWithUDP(queryBytes []byte, destination string) error {
 	if err != nil {
 		return fmt.Errorf("error sending data: %v\n", err)
 	}
+
 	return nil
 }
 
-func buildQuery(domainName string, recordType int) []byte {
+func buildQuery(domainName string, recordType uint16) []byte {
 	name := encodeDNSName(domainName)
 	rand.Seed(time.Now().UnixNano())
-	min := 10
-	max := 5000
-	id := rand.Intn(max-min+1) + min
+	id := uint16(rand.Intn(MAX_UINT_16_VAL))
 
 	header := DNSHeader{
-		ID:           id,
-		NumQuestions: 1,
-		Flags:        RECURSION_DESIRED,
+		ID:            id,
+		QuestionCount: 1,
+		Flags:         RECURSION_DESIRED,
 	}
 
 	question := DNSQuestion{
@@ -109,5 +119,8 @@ func buildQuery(domainName string, recordType int) []byte {
 		Type:  recordType,
 		Class: CLASS_IN,
 	}
-	return append(header.toBytes(), question.toBytes()...)
+	buf := bytes.Buffer{}
+	buf.Write(header.toBytes())
+	buf.Write(question.toBytes())
+	return buf.Bytes()
 }
