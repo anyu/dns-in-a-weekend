@@ -11,10 +11,15 @@ import (
 	"time"
 )
 
-const RECORD_TYPE_A = 1
-const CLASS_IN = 1               // IN = internet
-const RECURSION_DESIRED = 1 << 8 // 100000000 set 9th bit from right
-const MAX_UINT_16_VAL = 65535
+const (
+	recordTypeA = 1
+	// IN = internet
+	classIN = 1
+	// 100000000 set 9th bit from right
+	recursionDesired = 1 << 8
+)
+const maxUint16Value = 65535
+const dnsPort = "53"
 
 type DNSHeader struct {
 	// ID is a 16 bit identifier for a query. A new random ID should be used for each request.
@@ -60,11 +65,10 @@ func (q *DNSQuestion) toBytes() []byte {
 }
 
 func main() {
+	domain := "www.example.com"
+	nameserverIP := "8.8.8.8"
 
-	destination := "8.8.8.8:53"
-	queryBytes := buildQuery("www.example.com", RECORD_TYPE_A)
-
-	err := sendQueryWithUDP(queryBytes, destination)
+	err := sendQuery(domain, nameserverIP)
 	if err != nil {
 		log.Fatalf("error sending UDP query: %v\n", err)
 	}
@@ -88,8 +92,10 @@ func encodeDNSName(domainName string) []byte {
 	return buf.Bytes()
 }
 
-func sendQueryWithUDP(queryBytes []byte, destination string) error {
-	conn, err := net.Dial("udp", destination)
+func sendQuery(domainName, ip string) error {
+	queryBytes := buildQuery(domainName, recordTypeA)
+
+	conn, err := net.Dial("udp", ip+":"+dnsPort)
 	if err != nil {
 		return fmt.Errorf("error creating UDP connection: %v\n", err)
 	}
@@ -106,18 +112,18 @@ func sendQueryWithUDP(queryBytes []byte, destination string) error {
 func buildQuery(domainName string, recordType uint16) []byte {
 	name := encodeDNSName(domainName)
 	rand.Seed(time.Now().UnixNano())
-	id := uint16(rand.Intn(MAX_UINT_16_VAL))
+	id := uint16(rand.Intn(maxUint16Value))
 
 	header := DNSHeader{
 		ID:            id,
 		QuestionCount: 1,
-		Flags:         RECURSION_DESIRED,
+		Flags:         recursionDesired,
 	}
 
 	question := DNSQuestion{
 		Name:  name,
 		Type:  recordType,
-		Class: CLASS_IN,
+		Class: classIN,
 	}
 	buf := bytes.Buffer{}
 	buf.Write(header.toBytes())
