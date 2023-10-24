@@ -100,19 +100,25 @@ func buildQuery(domainName string, recordType uint16) []byte {
 	return buf.Bytes()
 }
 
-func sendQuery(domainName, ip string) error {
+func sendQuery(domainName, ip string) (*bytes.Reader, error) {
 	queryBytes := buildQuery(domainName, recordTypeA)
 
 	conn, err := net.Dial("udp", ip+":"+dnsPort)
 	if err != nil {
-		return fmt.Errorf("error creating UDP connection: %v\n", err)
+		return nil, fmt.Errorf("error creating UDP connection: %v\n", err)
 	}
 	defer conn.Close()
 
 	_, err = conn.Write(queryBytes)
 	if err != nil {
-		return fmt.Errorf("error sending data: %v\n", err)
+		return nil, fmt.Errorf("error sending data: %v\n", err)
 	}
 
-	return nil
+	resp := make([]byte, 1024)
+	_, err = conn.Read(resp)
+	if err != nil {
+		return nil, fmt.Errorf("error receiving response: %v\n", err)
+	}
+
+	return bytes.NewReader(resp), nil
 }
