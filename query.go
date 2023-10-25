@@ -100,12 +100,12 @@ func buildQuery(domainName string, recordType uint16) []byte {
 		Class: classIN,
 	}
 	buf := bytes.Buffer{}
-	h := header.toBytes()
-	fmt.Printf("q: %q\n", h)
-	fmt.Printf("p: %p\n", h)
-	fmt.Printf("#x: %#x\n", h)
-	q := question.toBytes()
-	fmt.Printf("x: %x\n", q)
+	// h := header.toBytes()
+	// fmt.Printf("q: %q\n", h)
+	// fmt.Printf("p: %p\n", h)
+	// fmt.Printf("#x: %#x\n", h)
+	// q := question.toBytes()
+	// fmt.Printf("x: %x\n", q)
 
 	buf.Write(header.toBytes())
 	buf.Write(question.toBytes())

@@ -17,10 +17,12 @@ type DNSRecord struct {
 	Data []byte
 }
 
-func parseHeader(r *bytes.Reader) DNSRecord {
-	record := DNSRecord{}
-	binary.Read(r, binary.BigEndian, &record.Type)
-	binary.Read(r, binary.BigEndian, &record.Class)
-	binary.Read(r, binary.BigEndian, &record.TTL)
-	return record
+func parseHeader(r *bytes.Reader) DNSHeader {
+	header := DNSHeader{}
+	// read name
+	// buf := bytes.Buffer{}
+	binary.Read(r, binary.BigEndian, &header.ID)
+	binary.Read(r, binary.BigEndian, &header.QuestionCount)
+	binary.Read(r, binary.BigEndian, &header.Flags)
+	return header
 }
