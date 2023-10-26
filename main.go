@@ -13,6 +13,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("error sending UDP query: %v\n", err)
 	}
-	record := parseHeader(respReader)
-	fmt.Printf("response: %v", record)
+	header, err := parseHeader(respReader)
+	if err != nil {
+		log.Fatalf("error parsing DNS header: %v\n", err)
+	}
+	fmt.Printf("response: %d", header)
 }

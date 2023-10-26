@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"math/rand"
 	"net"
 	"strings"
 )
@@ -80,19 +81,13 @@ func encodeDNSName(domainName string) []byte {
 
 func buildQuery(domainName string, recordType uint16) []byte {
 	name := encodeDNSName(domainName)
-	// id := uint16(rand.Intn(maxUint16Value))
+	id := uint16(rand.Intn(maxUint16Value))
 
-	// header := DNSHeader{
-	// 	ID:            id,
-	// 	QuestionCount: 1,
-	// 	Flags:         recursionDesired,
-	// }
 	header := DNSHeader{
-		ID:            4884,
+		ID:            id,
 		QuestionCount: 1,
-		Flags:         0,
+		Flags:         recursionDesired,
 	}
-	// header_to_bytes(DNSHeader(id=, flags=0, num_questions=1, num_additionals=0, num_authorities=0, num_answers=0))
 
 	question := DNSQuestion{
 		Name:  name,
@@ -100,13 +95,6 @@ func buildQuery(domainName string, recordType uint16) []byte {
 		Class: classIN,
 	}
 	buf := bytes.Buffer{}
-	// h := header.toBytes()
-	// fmt.Printf("q: %q\n", h)
-	// fmt.Printf("p: %p\n", h)
-	// fmt.Printf("#x: %#x\n", h)
-	// q := question.toBytes()
-	// fmt.Printf("x: %x\n", q)
-
 	buf.Write(header.toBytes())
 	buf.Write(question.toBytes())
 	return buf.Bytes()
