@@ -5,6 +5,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"log"
+	"strings"
 )
 
 type DNSRecord struct {
@@ -19,7 +21,7 @@ type DNSRecord struct {
 	Data []byte
 }
 
-func parseHeader(r *bytes.Reader) (DNSHeader, error) {
+func parseHeader(r io.Reader) (DNSHeader, error) {
 	header := DNSHeader{}
 	err := binary.Read(r, binary.BigEndian, &header.ID)
 	if err != nil {
@@ -55,7 +57,7 @@ func decodeDNSName(r io.Reader) (string, error) {
 		lengthByte := make([]byte, 1)
 		_, err := r.Read(lengthByte)
 		if err != nil {
-			fmt.Errorf("error decoding name, %w", err)
+			log.Printf("error decoding name, %v", err)
 			break
 		}
 		// DNS domain names are terminated by a 0-byte, so
@@ -68,17 +70,17 @@ func decodeDNSName(r io.Reader) (string, error) {
 		// Use bitmask to mask the 2 most significant bits of the length byte and check if they are set to 1.
 		// If both of are set to 1, the length byte is a pointer to a compressed name in the DNS message
 		// and the following bits specify the offset of the compressed name.
-		if (length & 0xc0) == 0xc0 { // 11000000 in binary
+		if (length & 11000000) == 11000000 { // 0xc0 in hexadecimal
 			offsetByte := make([]byte, 1)
 			_, err := r.Read(offsetByte)
 			if err != nil {
-				fmt.Errorf("error reading compressed name offset, %w", err)
+				log.Printf("error reading compressed name offset, %v", err)
 				break
 			}
 
 			// Use bitmask to CLEAR the 2 most significant bits of the length byte, which extracts the lower 6 bits of length,
-			// which represent a part of the offset. 0x3f = 00111111 in binary.
-			lowerLengthBits := length & 0x3f
+			// which represent a part of the offset. 0x3f in hexadecimal
+			lowerLengthBits := length & 00111111
 
 			// Retrieves the first byte of the offsetByte as an integer. Represents the lower 8 bits of the offset.
 			offsetByteFirstByteAsInt := int(offsetByte[0])
@@ -87,14 +89,14 @@ func decodeDNSName(r io.Reader) (string, error) {
 			// Result is a 16-bit value where bits 0-7 = 0, bits 8-13 = the lower 6 bits of `length`.
 
 			lowerLengthBitsShifted := lowerLengthBits << 8
-			// Use  bitwise OR to combine the 2 16-bit values obtained above.
+			// Use bitwise OR to combine the 2 16-bit values obtained above.
 			// Result is a 16-bit integer where the lower 8 bits are set to the value in offsetByte,
 			// and the higher 6 bits are set to the lower 6 bits of length.
 			offset := int(lowerLengthBitsShifted | offsetByteFirstByteAsInt)
 
 			compressedName, err := decodeCompressedName(r, offset)
 			if err != nil {
-				fmt.Errorf("error decoding name, %w", err)
+				log.Printf("error decoding name, %v", err)
 				break
 			}
 			labels = append(labels, compressedName)
@@ -103,18 +105,17 @@ func decodeDNSName(r io.Reader) (string, error) {
 			labelBytes := make([]byte, length)
 			_, err := r.Read(labelBytes)
 			if err != nil {
-				fmt.Errorf("error  name, %w", err)
+				log.Printf("error reading label, %v", err)
 				break
 			}
 			labels = append(labels, string(labelBytes))
 		}
 	}
-	b := bytes.Join(labels, []byte("."))
-	return b, nil
+	return strings.Join(labels, "."), nil
 }
 
-func decodeCompressedName(reader io.Reader, offset int) (string, error) {
-	offsetReader := io.LimitReader(reader, int64(offset))
+func decodeCompressedName(r io.Reader, offset int) (string, error) {
+	offsetReader := io.LimitReader(r, int64(offset))
 	name, err := decodeDNSName(offsetReader)
 	if err != nil {
 		return "", fmt.Errorf("error decoding dns name: %w", err)

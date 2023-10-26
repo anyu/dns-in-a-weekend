@@ -17,5 +17,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("error parsing DNS header: %v\n", err)
 	}
-	fmt.Printf("response: %d", header)
+	question, err := parseQuestion(respReader)
+	if err != nil {
+		log.Fatalf("error parsing DNS question: %v\n", err)
+	}
+	fmt.Printf("header: %v", header)
+	fmt.Printf("question domain name: %s", question.Name)
 }
