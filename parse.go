@@ -21,7 +21,7 @@ type DNSRecord struct {
 	Data []byte
 }
 
-func parseHeader(r io.Reader) (DNSHeader, error) {
+func parseHeader(r *bytes.Reader) (DNSHeader, error) {
 	header := DNSHeader{}
 	err := binary.Read(r, binary.BigEndian, &header.ID)
 	if err != nil {
@@ -140,4 +140,37 @@ func parseQuestion(r *bytes.Reader) (DNSQuestion, error) {
 	question.Name = []byte(name)
 
 	return question, nil
+}
+
+func parseRecord(r *bytes.Reader) (DNSRecord, error) {
+	record := DNSRecord{}
+	name, err := decodeDNSName(r)
+	if err != nil {
+		return DNSRecord{}, err
+	}
+	lengthByte := make([]byte, 10)
+	_, err = r.Read(lengthByte)
+	if err != nil {
+		log.Printf("error decoding name, %v", err)
+	}
+	err = binary.Read(r, binary.BigEndian, &record.Type)
+	if err != nil {
+		return DNSRecord{}, err
+	}
+	err = binary.Read(r, binary.BigEndian, &record.Class)
+	if err != nil {
+		return DNSRecord{}, err
+	}
+	err = binary.Read(r, binary.BigEndian, &record.TTL)
+	if err != nil {
+		return DNSRecord{}, err
+	}
+	err = binary.Read(r, binary.BigEndian, &record.Data)
+	if err != nil {
+		return DNSRecord{}, err
+	}
+
+	record.Name = []byte(name)
+
+	return record, nil
 }

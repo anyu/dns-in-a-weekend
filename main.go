@@ -21,6 +21,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("error parsing DNS question: %v\n", err)
 	}
+	record, err := parseRecord(respReader)
+	if err != nil {
+		log.Fatalf("error parsing DNS record: %v\n", err)
+	}
 	fmt.Printf("header: %v", header)
-	fmt.Printf("question domain name: %s", question.Name)
+	fmt.Printf("question name: %s", question.Name)
+	fmt.Printf("record: %s", record.Name)
+	fmt.Printf("record data: %s", record.Data)
 }
