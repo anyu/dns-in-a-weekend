@@ -148,27 +148,28 @@ func parseRecord(r *bytes.Reader) (DNSRecord, error) {
 	if err != nil {
 		return DNSRecord{}, err
 	}
-	lengthByte := make([]byte, 10)
-	_, err = r.Read(lengthByte)
+	outputBytes := make([]byte, 10)
+	_, err = r.Read(outputBytes)
 	if err != nil {
 		log.Printf("error decoding name, %v", err)
 	}
+	fmt.Printf(" &record.Type %d)", record.Class)
 	err = binary.Read(r, binary.BigEndian, &record.Type)
 	if err != nil {
 		return DNSRecord{}, err
 	}
-	err = binary.Read(r, binary.BigEndian, &record.Class)
-	if err != nil {
-		return DNSRecord{}, err
-	}
-	err = binary.Read(r, binary.BigEndian, &record.TTL)
-	if err != nil {
-		return DNSRecord{}, err
-	}
-	err = binary.Read(r, binary.BigEndian, &record.Data)
-	if err != nil {
-		return DNSRecord{}, err
-	}
+	// err = binary.Read(r, binary.BigEndian, &record.Class)
+	// if err != nil {
+	// 	return DNSRecord{}, err
+	// }
+	// err = binary.Read(r, binary.BigEndian, &record.TTL)
+	// if err != nil {
+	// 	return DNSRecord{}, err
+	// }
+	// err = binary.Read(r, binary.BigEndian, &record.Data)
+	// if err != nil {
+	// 	return DNSRecord{}, err
+	// }
 
 	record.Name = []byte(name)
 

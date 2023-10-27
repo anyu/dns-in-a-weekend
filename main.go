@@ -30,5 +30,6 @@ func main() {
 	fmt.Printf("header: %v", header)
 	fmt.Printf("question name: %s", question.Name)
 	fmt.Printf("record: %s", record.Name)
-	fmt.Printf("record data: %s", record.Data)
+	// fmt.Printf("record type: %v", record.Type)
+	// fmt.Printf("record data: %s", record.Data)
 }

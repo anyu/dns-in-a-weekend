@@ -35,31 +35,36 @@ type DNSHeader struct {
 }
 
 func (h *DNSHeader) toBytes() []byte {
-	buf := bytes.Buffer{}
-	binary.Write(&buf, binary.BigEndian, h.ID)
-	binary.Write(&buf, binary.BigEndian, h.Flags)
-	binary.Write(&buf, binary.BigEndian, h.QuestionCount)
-	binary.Write(&buf, binary.BigEndian, h.AnswerCount)
-	binary.Write(&buf, binary.BigEndian, h.AuthorityCount)
-	binary.Write(&buf, binary.BigEndian, h.AdditionalCount)
-	return buf.Bytes()
+	// We can create a fixed-size byte slice of 12 bytes,
+	// since we have six 2-byte sized fields.
+	buf := make([]byte, 12)
+	binary.BigEndian.PutUint16(buf[0:2], h.ID)
+	binary.BigEndian.PutUint16(buf[2:4], h.Flags)
+	binary.BigEndian.PutUint16(buf[4:6], h.QuestionCount)
+	binary.BigEndian.PutUint16(buf[6:8], h.AnswerCount)
+	binary.BigEndian.PutUint16(buf[8:10], h.AuthorityCount)
+	binary.BigEndian.PutUint16(buf[10:12], h.AdditionalCount)
+	return buf
 }
 
 type DNSQuestion struct {
 	// Name is the domain name being queried, eg. example.com
 	Name []byte
-	// Type is the type of record being queried, eg. A
+	// Type is an unsigned 16 bit integer specifying the type of record being queried, eg. A
 	Type uint16
-	// Class is the class of records being queried. Always the same, 1 for IN.
+	// Class an unsigned 16 bit integer specifying the class of records being queried. Always the same, 1 for IN.
 	Class uint16
 }
 
 func (q *DNSQuestion) toBytes() []byte {
-	buf := bytes.Buffer{}
-	binary.Write(&buf, binary.BigEndian, q.Name)
-	binary.Write(&buf, binary.BigEndian, q.Type)
-	binary.Write(&buf, binary.BigEndian, q.Class)
-	return buf.Bytes()
+	nameSize := len(q.Name)
+	buf := make([]byte, nameSize+4) // plus 2 bytes for Type, 2 bytes for Class
+	// copy the Name bytes to the buffer
+	copy(buf[0:nameSize], q.Name)
+
+	binary.BigEndian.PutUint16((buf[nameSize : nameSize+2]), q.Type)
+	binary.BigEndian.PutUint16((buf[nameSize+2 : nameSize+4]), q.Class)
+	return buf
 }
 
 // DNS expects each label (e.g., "www" or "example") to be preceded
