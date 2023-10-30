@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"log"
 	"strings"
 )
 
@@ -38,7 +37,7 @@ func parseDNSPacket(data []byte) (DNSPacket, error) {
 	r := bytes.NewReader(data)
 	header, err := parseHeader(r)
 	if err != nil {
-		log.Fatalf("error parsing DNS header: %v\n", err)
+		return DNSPacket{}, fmt.Errorf("error parsing DNS header: %v", err)
 	}
 
 	questions := []DNSQuestion{}
@@ -46,7 +45,7 @@ func parseDNSPacket(data []byte) (DNSPacket, error) {
 	for i := 0; i < qCount; i++ {
 		q, err := parseQuestion(r)
 		if err != nil {
-			log.Fatalf("error parsing DNS question: %v\n", err)
+			return DNSPacket{}, fmt.Errorf("error parsing DNS question: %v", err)
 		}
 		questions = append(questions, q)
 	}
@@ -56,7 +55,7 @@ func parseDNSPacket(data []byte) (DNSPacket, error) {
 	for i := 0; i < ansCount; i++ {
 		answer, err := parseRecord(r)
 		if err != nil {
-			log.Fatalf("error parsing DNS record: %v\n", err)
+			return DNSPacket{}, fmt.Errorf("error parsing DNS record: %v", err)
 		}
 		answers = append(answers, answer)
 	}
@@ -66,7 +65,7 @@ func parseDNSPacket(data []byte) (DNSPacket, error) {
 	for i := 0; i < authCount; i++ {
 		authority, err := parseRecord(r)
 		if err != nil {
-			log.Fatalf("error parsing DNS record: %v\n", err)
+			return DNSPacket{}, fmt.Errorf("error parsing DNS record: %v", err)
 		}
 		authorities = append(authorities, authority)
 	}
@@ -76,7 +75,7 @@ func parseDNSPacket(data []byte) (DNSPacket, error) {
 	for i := 0; i < additionalCount; i++ {
 		additional, err := parseRecord(r)
 		if err != nil {
-			log.Fatalf("error parsing DNS record: %v\n", err)
+			return DNSPacket{}, fmt.Errorf("error parsing DNS record: %v", err)
 		}
 		additionals = append(additionals, additional)
 	}
@@ -194,25 +193,25 @@ func decodeCompressedName(r io.Reader, length int) (string, error) {
 	// Record the current position of the reader
 	currentPos, err := r.(io.Seeker).Seek(0, io.SeekCurrent) // 0 = offset
 	if err != nil {
-		return "", fmt.Errorf("error recording current reader position: %w", err)
+		return "", fmt.Errorf("error recording current reader position: %v", err)
 	}
 
 	// Move the read position to the pointer position
 	_, err = r.(io.Seeker).Seek(int64(pointer), io.SeekStart)
 	if err != nil {
-		return "", fmt.Errorf("error moving reader to pointer position: %w", err)
+		return "", fmt.Errorf("error moving reader to pointer position: %v", err)
 	}
 
 	// Decode the DNS name at the pointer position
 	name, err := decodeDNSName(r)
 	if err != nil {
-		return "", fmt.Errorf("error decoding dns name at pointer position: %w", err)
+		return "", fmt.Errorf("error decoding dns name at pointer position: %v", err)
 	}
 	// Move the read position back to where we left off reading the DNS message
 	// since that'll be where the remainder of the DNS record fields are.
 	_, err = r.(io.Seeker).Seek(currentPos, io.SeekStart)
 	if err != nil {
-		return "", fmt.Errorf("error moving reader to: %w", err)
+		return "", fmt.Errorf("error moving reader to: %v", err)
 	}
 	return name, nil
 }
@@ -221,13 +220,13 @@ func parseRecord(r *bytes.Reader) (DNSRecord, error) {
 	record := DNSRecord{}
 	name, err := decodeDNSName(r)
 	if err != nil {
-		return DNSRecord{}, fmt.Errorf("error decoding DNS name: %w", err)
+		return DNSRecord{}, fmt.Errorf("error decoding DNS name: %v", err)
 	}
 	record.Name = []byte(name)
 
 	remainingBytes := make([]byte, 10)
 	if _, err := r.Read(remainingBytes); err != nil {
-		return DNSRecord{}, fmt.Errorf("error reading remaining bytes: %w", err)
+		return DNSRecord{}, fmt.Errorf("error reading remaining bytes: %v", err)
 	}
 
 	record.Type = binary.BigEndian.Uint16(remainingBytes[0:2])
@@ -238,7 +237,7 @@ func parseRecord(r *bytes.Reader) (DNSRecord, error) {
 	dataBytes := make([]byte, dataLength)
 	_, err = r.Read(dataBytes)
 	if err != nil {
-		return DNSRecord{}, fmt.Errorf("error reading data bytes: %w", err)
+		return DNSRecord{}, fmt.Errorf("error reading data bytes: %v", err)
 	}
 	record.Data = dataBytes
 
