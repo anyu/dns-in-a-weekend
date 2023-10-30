@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"log"
 	"strings"
 )
 
@@ -18,6 +19,75 @@ type DNSRecord struct {
 	TTL uint32
 	// Data represents the content, like the IP.
 	Data []byte
+}
+
+type DNSPacket struct {
+	// Header contains the DNS header information for the packet.
+	Header DNSHeader
+	// Questions holds DNS questions included in the packet.
+	Questions []DNSQuestion
+	// Answers holds DNS records that provide answers to the questions in the packet.
+	Answers []DNSRecord
+	// Authorities holds DNS records that specify the uthoritative servers for the queried domain.
+	Authorities []DNSRecord
+	// Additionals holds additional DNS records that may include extra information relevant to the DNS query.
+	Additionals []DNSRecord
+}
+
+func parseDNSPacket(data []byte) (DNSPacket, error) {
+	r := bytes.NewReader(data)
+	header, err := parseHeader(r)
+	if err != nil {
+		log.Fatalf("error parsing DNS header: %v\n", err)
+	}
+
+	questions := []DNSQuestion{}
+	qCount := int(header.QuestionCount)
+	for i := 0; i < qCount; i++ {
+		q, err := parseQuestion(r)
+		if err != nil {
+			log.Fatalf("error parsing DNS question: %v\n", err)
+		}
+		questions = append(questions, q)
+	}
+
+	answers := []DNSRecord{}
+	ansCount := int(header.AnswerCount)
+	for i := 0; i < ansCount; i++ {
+		answer, err := parseRecord(r)
+		if err != nil {
+			log.Fatalf("error parsing DNS record: %v\n", err)
+		}
+		answers = append(answers, answer)
+	}
+
+	authorities := []DNSRecord{}
+	authCount := int(header.AuthorityCount)
+	for i := 0; i < authCount; i++ {
+		authority, err := parseRecord(r)
+		if err != nil {
+			log.Fatalf("error parsing DNS record: %v\n", err)
+		}
+		authorities = append(authorities, authority)
+	}
+
+	additionals := []DNSRecord{}
+	additionalCount := int(header.AdditionalCount)
+	for i := 0; i < additionalCount; i++ {
+		additional, err := parseRecord(r)
+		if err != nil {
+			log.Fatalf("error parsing DNS record: %v\n", err)
+		}
+		additionals = append(additionals, additional)
+	}
+	return DNSPacket{
+		Header:      header,
+		Questions:   questions,
+		Answers:     answers,
+		Authorities: authorities,
+		Additionals: additionals,
+	}, nil
+
 }
 
 func parseHeader(r *bytes.Reader) (DNSHeader, error) {
