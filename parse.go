@@ -5,18 +5,17 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"log"
 	"strings"
 )
 
 type DNSRecord struct {
 	Name []byte
-	// Type is the type of record being queried, eg. A
-	Type int
-	// Class is the class of records being queried. Always the same, 1 for IN.
-	Class int
-	// TTL specifies long to cache the query for.
-	TTL int
+	// Type is an unsigned 16 bit integer specifying the type of record being queried, eg. A
+	Type uint16
+	// Class an unsigned 16 bit integer specifying the class of records being queried. Always the same, 1 for IN.
+	Class uint16
+	// TTL specifies how long to cache the query for.
+	TTL uint32
 	// Data represents the content, like the IP.
 	Data []byte
 }
@@ -59,21 +58,16 @@ func decodeDNSName(r io.Reader) (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("error decoding name, %v", err)
 		}
-		// DNS domain names are terminated by a 0-byte, so
-		// check if the first element of the returned byte is 0.
-		// If it's not 0, use bitmask to mask the 2 most significant bits of the length byte and check if they are set to 1.
-		// If both are set to 1, the length byte is a pointer to a compressed name in the DNS message
-		// and the following bits specify the offset of the compressed name.
+		// DNS domain names are terminated by a 0-byte
 		length := int(lengthByte[0])
-		if length == 0 {
-			fmt.Printf("length is 0\n")
+		if length == 0 { // stop if domain name has terminated
 			break
 		}
-		fmt.Printf("lengthbyte: %v\n", lengthByte)
-		fmt.Printf("length: %v\n", length)
 
+		// Use a bitmask to mask the 2 leftmost bits of the length byte to check if they are set to 1.
+		// If both are set to 1, it indicates a pointer to a compressed name in the DNS message
+		// and the following bits specify the offset of the compressed name.
 		if length&0b11000000 == 0b11000000 { // 0xc0 in hexadecimal
-			fmt.Print("bitmask is true\n")
 			compressedName, err := decodeCompressedName(r, length)
 			if err != nil {
 				return "", fmt.Errorf("error decoding compressed name %v", err)
@@ -81,7 +75,7 @@ func decodeDNSName(r io.Reader) (string, error) {
 			labels = append(labels, compressedName)
 			break
 		} else {
-			// It's a regular label
+			// It's a regular non-compressed label
 			labelBytes := make([]byte, length)
 			_, err = r.Read(labelBytes)
 			if err != nil {
@@ -95,45 +89,36 @@ func decodeDNSName(r io.Reader) (string, error) {
 
 func decodeCompressedName(r io.Reader, length int) (string, error) {
 
-	// Use bitmask to CLEAR the 2 most significant bits of the length byte, which extracts the lower 6 bits of length,
-	// which represent a part of the offset. 0x3f in hexadecimal
-	if length == 0 {
-		return "", nil // The domain name is terminated
-	}
-
-	// Store the lower six bits into the first byte
 	singleByte := make([]byte, 1)
 	_, err := r.Read(singleByte)
 	if err != nil {
 		return "", fmt.Errorf("error reading pointer bytes: %w", err)
 	}
-	byteSlice := []byte{byte(length & 0b00111111)}
-	byteSlice = append(byteSlice, singleByte...)
+	// Use bitmask to CLEAR the 2 most significant bits of the length byte, which extracts the lower 6 bits of length,
+	// which is the offset bits.
+	offset := byte(length & 0b00111111) // 0x3f in hexadecimal
 
-	fmt.Printf("byteslice: %v", byteSlice)
-	// Converts byteSlice into a 16-bit unsigned int
-	pointer := binary.BigEndian.Uint16(byteSlice)
-	// Records current position of reader
-	fmt.Printf("pointer: %v", pointer)
+	// Combine the offset bits with the second byte to get the pointer value
+	pointerBytes := []byte{offset, singleByte[0]}
+	pointer := binary.BigEndian.Uint16(pointerBytes)
+
+	// Record current position of reader
 	currentPos, _ := r.(io.Seeker).Seek(0, io.SeekCurrent)
-	fmt.Printf("currentPos: %v", currentPos)
-	if pointer == 0 {
-		return "", nil
-	}
-	// Seek until pointer position
+
+	// Seek to the pointer position
 	_, err = r.(io.Seeker).Seek(int64(pointer), io.SeekStart)
 	if err != nil {
 		return "", err
 	}
 
-	fmt.Printf("r: %v", r)
+	// Decode the DNS name at the pointer position
 	name, err := decodeDNSName(r)
 	if err != nil {
 		return "", fmt.Errorf("error decoding dns name: %w", err)
 	}
 	_, err = r.(io.Seeker).Seek(currentPos, io.SeekStart)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("error seeking through reader: %w", err)
 	}
 	return name, nil
 }
@@ -165,27 +150,22 @@ func parseRecord(r *bytes.Reader) (DNSRecord, error) {
 	}
 	record.Name = []byte(name)
 
-	outputBytes := make([]byte, 10)
-	_, err = r.Read(outputBytes)
-	if err != nil {
-		log.Printf("error decoding name, %v", err)
+	remainingBytes := make([]byte, 10)
+	if _, err := r.Read(remainingBytes); err != nil {
+		return DNSRecord{}, err
 	}
-	// err = binary.Read(r, binary.BigEndian, &record.Type)
-	// if err != nil {
-	// 	return DNSRecord{}, err
-	// }
-	// err = binary.Read(r, binary.BigEndian, &record.Class)
-	// if err != nil {
-	// 	return DNSRecord{}, err
-	// }
-	// err = binary.Read(r, binary.BigEndian, &record.TTL)
-	// if err != nil {
-	// 	return DNSRecord{}, err
-	// }
-	// err = binary.Read(r, binary.BigEndian, &record.Data)
-	// if err != nil {
-	// 	return DNSRecord{}, err
-	// }
+
+	record.Type = binary.BigEndian.Uint16(remainingBytes[0:2])
+	record.Class = binary.BigEndian.Uint16(remainingBytes[2:4])
+	record.TTL = binary.BigEndian.Uint32(remainingBytes[4:8])
+
+	dataLength := binary.BigEndian.Uint16(remainingBytes[8:])
+	dataBytes := make([]byte, dataLength)
+	_, err = r.Read(dataBytes)
+	if err != nil {
+		return DNSRecord{}, err
+	}
+	record.Data = dataBytes
 
 	return record, nil
 }
