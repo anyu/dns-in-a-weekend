@@ -1,4 +1,4 @@
-package main
+package dns
 
 import (
 	"bytes"
@@ -10,10 +10,7 @@ import (
 )
 
 const (
-	recordTypeA = 1
 	// IN = internet
-	recordTypeNS = 2
-	// NS = nameserver record
 	classIN = 1
 	// 100000000 set 9th bit from right
 	recursionDesired = 1 << 8
@@ -37,8 +34,7 @@ type DNSHeader struct {
 }
 
 func (h *DNSHeader) toBytes() []byte {
-	// We can create a fixed-size byte slice of 12 bytes,
-	// since we have six 2-byte sized fields.
+	// We can create a fixed-size byte slice of 12 bytes since we have six 2-byte sized fields.
 	buf := make([]byte, 12)
 	binary.BigEndian.PutUint16(buf[0:2], h.ID)
 	binary.BigEndian.PutUint16(buf[2:4], h.Flags)
@@ -52,9 +48,9 @@ func (h *DNSHeader) toBytes() []byte {
 type DNSQuestion struct {
 	// Name is the domain name being queried, eg. example.com
 	Name []byte
-	// Type is an unsigned 16 bit integer specifying the type of record being queried, eg. A
+	// Type is an unsigned 16 bit integer specifying the type of the record being queried, eg. A
 	Type uint16
-	// Class an unsigned 16 bit integer specifying the class of records being queried. Always the same, 1 for IN.
+	// Class an unsigned 16 bit integer specifying the class of the record being queried. Always the same, 1 for IN.
 	Class uint16
 }
 

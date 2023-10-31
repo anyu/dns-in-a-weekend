@@ -1,4 +1,4 @@
-package main
+package dns
 
 import (
 	"bytes"
@@ -9,10 +9,11 @@ import (
 )
 
 type DNSRecord struct {
+	// Name is the domain name to which the record applies.
 	Name []byte
-	// Type is an unsigned 16 bit integer specifying the type of record being queried, eg. A
+	// Type is an unsigned 16 bit integer specifying the type of the record, eg. A
 	Type uint16
-	// Class an unsigned 16 bit integer specifying the class of records being queried. Always the same, 1 for IN.
+	// Class an unsigned 16 bit integer specifying the class of the record. Always the same, 1 for IN.
 	Class uint16
 	// TTL specifies how long to cache the query for.
 	TTL uint32
@@ -33,12 +34,43 @@ type DNSPacket struct {
 	Additionals []DNSRecord
 }
 
+func (p DNSPacket) getAnswer() []byte {
+	// return the first A record in the Answer section
+	for _, a := range p.Answers {
+		if a.Type == recordTypeA {
+			return a.Data
+		}
+	}
+	return nil
+}
+
+func (p DNSPacket) getNameserverIP() []byte {
+	// return the first A record in the Additional section
+	for _, a := range p.Additionals {
+		if a.Type == recordTypeA {
+			return a.Data
+		}
+	}
+	return nil
+}
+
+func (p DNSPacket) getNameserver() string {
+	// return the first NS record in the Authority section
+	for _, a := range p.Authorities {
+		if a.Type == recordTypeNS {
+			return string(a.Data)
+		}
+	}
+	return ""
+}
+
 func parseDNSPacket(data []byte) (DNSPacket, error) {
 	r := bytes.NewReader(data)
 	header, err := parseHeader(r)
 	if err != nil {
 		return DNSPacket{}, fmt.Errorf("error parsing DNS header: %v", err)
 	}
+
 	questions := []DNSQuestion{}
 	qCount := int(header.QuestionCount)
 	for i := 0; i < qCount; i++ {
@@ -215,34 +247,6 @@ func decodeCompressedName(r io.Reader, length int) (string, error) {
 	return name, nil
 }
 
-func parseRecord1(r *bytes.Reader) (DNSRecord, error) {
-	record := DNSRecord{}
-	name, err := decodeDNSName(r)
-	if err != nil {
-		return DNSRecord{}, fmt.Errorf("error decoding DNS name: %v", err)
-	}
-	record.Name = []byte(name)
-
-	remainingBytes := make([]byte, 10)
-	if _, err := r.Read(remainingBytes); err != nil {
-		return DNSRecord{}, fmt.Errorf("error reading remaining bytes: %v", err)
-	}
-
-	record.Type = binary.BigEndian.Uint16(remainingBytes[0:2])
-	record.Class = binary.BigEndian.Uint16(remainingBytes[2:4])
-	record.TTL = binary.BigEndian.Uint32(remainingBytes[4:8])
-
-	dataLength := binary.BigEndian.Uint16(remainingBytes[8:])
-	dataBytes := make([]byte, dataLength)
-	_, err = r.Read(dataBytes)
-	if err != nil {
-		return DNSRecord{}, fmt.Errorf("error reading data bytes: %v", err)
-	}
-	record.Data = dataBytes
-
-	return record, nil
-}
-
 func parseRecord(r *bytes.Reader) (DNSRecord, error) {
 	record := DNSRecord{}
 	name, err := decodeDNSName(r)
@@ -283,4 +287,12 @@ func parseRecord(r *bytes.Reader) (DNSRecord, error) {
 	}
 
 	return record, nil
+}
+
+func ipToString(ip []byte) string {
+	parts := make([]string, len(ip))
+	for i, val := range ip {
+		parts[i] = fmt.Sprintf("%d", val)
+	}
+	return strings.Join(parts, ".")
 }
