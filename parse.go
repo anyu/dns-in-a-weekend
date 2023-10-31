@@ -39,7 +39,6 @@ func parseDNSPacket(data []byte) (DNSPacket, error) {
 	if err != nil {
 		return DNSPacket{}, fmt.Errorf("error parsing DNS header: %v", err)
 	}
-
 	questions := []DNSQuestion{}
 	qCount := int(header.QuestionCount)
 	for i := 0; i < qCount; i++ {

@@ -112,27 +112,7 @@ func buildQuery(domainName string, recordType uint16, useRecursion bool) []byte 
 	return buf.Bytes()
 }
 
-func sendQuery(queryBytes []byte, ip string) ([]byte, error) {
-	conn, err := net.Dial("udp", ip+":"+dnsPort)
-	if err != nil {
-		return nil, fmt.Errorf("error creating UDP connection: %v", err)
-	}
-	defer conn.Close()
-
-	_, err = conn.Write(queryBytes)
-	if err != nil {
-		return nil, fmt.Errorf("error sending data: %v", err)
-	}
-
-	resp := make([]byte, 1024)
-	_, err = conn.Read(resp)
-	if err != nil {
-		return nil, fmt.Errorf("error receiving response: %v", err)
-	}
-	return resp, nil
-}
-
-func sendQuery2(queryBytes []byte, ip string) (DNSPacket, error) {
+func sendQuery(queryBytes []byte, ip string) (DNSPacket, error) {
 	conn, err := net.Dial("udp", ip+":"+dnsPort)
 	if err != nil {
 		return DNSPacket{}, fmt.Errorf("error creating UDP connection: %v", err)
