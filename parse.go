@@ -216,7 +216,7 @@ func decodeCompressedName(r io.Reader, length int) (string, error) {
 	return name, nil
 }
 
-func parseRecord(r *bytes.Reader) (DNSRecord, error) {
+func parseRecord1(r *bytes.Reader) (DNSRecord, error) {
 	record := DNSRecord{}
 	name, err := decodeDNSName(r)
 	if err != nil {
@@ -240,6 +240,48 @@ func parseRecord(r *bytes.Reader) (DNSRecord, error) {
 		return DNSRecord{}, fmt.Errorf("error reading data bytes: %v", err)
 	}
 	record.Data = dataBytes
+
+	return record, nil
+}
+
+func parseRecord(r *bytes.Reader) (DNSRecord, error) {
+	record := DNSRecord{}
+	name, err := decodeDNSName(r)
+	if err != nil {
+		return DNSRecord{}, fmt.Errorf("error decoding DNS name: %v", err)
+	}
+	record.Name = []byte(name)
+
+	remainingBytes := make([]byte, 10)
+	if _, err := r.Read(remainingBytes); err != nil {
+		return DNSRecord{}, fmt.Errorf("error reading remaining bytes: %v", err)
+	}
+
+	record.Type = binary.BigEndian.Uint16(remainingBytes[0:2])
+	record.Class = binary.BigEndian.Uint16(remainingBytes[2:4])
+	record.TTL = binary.BigEndian.Uint32(remainingBytes[4:8])
+	dataLength := binary.BigEndian.Uint16(remainingBytes[8:])
+	dataBytes := make([]byte, dataLength)
+
+	if record.Type == recordTypeNS {
+		data, err := decodeDNSName(r)
+		if err != nil {
+			return DNSRecord{}, fmt.Errorf("error decoding name: %v", err)
+		}
+		record.Data = []byte(data)
+	} else if record.Type == recordTypeA {
+		_, err := r.Read(dataBytes)
+		if err != nil {
+			return DNSRecord{}, fmt.Errorf("error reading data bytes: %v", err)
+		}
+		record.Data = []byte(ipToString(dataBytes))
+	} else {
+		_, err := r.Read(dataBytes)
+		if err != nil {
+			return DNSRecord{}, fmt.Errorf("error reading data bytes: %v", err)
+		}
+		record.Data = dataBytes
+	}
 
 	return record, nil
 }

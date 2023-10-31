@@ -12,6 +12,8 @@ import (
 const (
 	recordTypeA = 1
 	// IN = internet
+	recordTypeNS = 2
+	// NS = nameserver record
 	classIN = 1
 	// 100000000 set 9th bit from right
 	recursionDesired = 1 << 8
@@ -84,14 +86,19 @@ func encodeDNSName(domainName string) []byte {
 	return buf.Bytes()
 }
 
-func buildQuery(domainName string, recordType uint16) []byte {
+func buildQuery(domainName string, recordType uint16, useRecursion bool) []byte {
 	name := encodeDNSName(domainName)
 	id := uint16(rand.Intn(maxUint16Value))
+
+	flags := uint16(0)
+	if useRecursion {
+		flags = recursionDesired
+	}
 
 	header := DNSHeader{
 		ID:            id,
 		QuestionCount: 1,
-		Flags:         recursionDesired,
+		Flags:         flags,
 	}
 
 	question := DNSQuestion{
@@ -123,4 +130,28 @@ func sendQuery(queryBytes []byte, ip string) ([]byte, error) {
 		return nil, fmt.Errorf("error receiving response: %v", err)
 	}
 	return resp, nil
+}
+
+func sendQuery2(queryBytes []byte, ip string) (DNSPacket, error) {
+	conn, err := net.Dial("udp", ip+":"+dnsPort)
+	if err != nil {
+		return DNSPacket{}, fmt.Errorf("error creating UDP connection: %v", err)
+	}
+	defer conn.Close()
+
+	_, err = conn.Write(queryBytes)
+	if err != nil {
+		return DNSPacket{}, fmt.Errorf("error sending data: %v", err)
+	}
+
+	resp := make([]byte, 1024)
+	_, err = conn.Read(resp)
+	if err != nil {
+		return DNSPacket{}, fmt.Errorf("error receiving response: %v", err)
+	}
+	packet, err := parseDNSPacket(resp)
+	if err != nil {
+		return DNSPacket{}, fmt.Errorf("error parsing DNS packet: %v", err)
+	}
+	return packet, nil
 }
