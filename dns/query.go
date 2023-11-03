@@ -15,7 +15,7 @@ const (
 	// 100000000 set 9th bit from right
 	recursionDesired = 1 << 8
 )
-const maxUint16Value = 65535
+const maxUint16Value = 2 ^ 16 - 1 // 65535
 const dnsPort = "53"
 
 type DNSHeader struct {
