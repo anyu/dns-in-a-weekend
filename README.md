@@ -3,7 +3,7 @@ Go implemention of [Implement DNS in a Weekend](https://implement-dns.wizardzine
 
 ## Usage
 
-```go
+```sh
 $ go run cmd/main.go twitter.com
 
 Querying 198.41.0.4 for twitter.com...
