@@ -35,14 +35,14 @@ type DNSHeader struct {
 
 func (h *DNSHeader) toBytes() []byte {
 	// We can create a fixed-size byte slice of 12 bytes since we have six 2-byte sized fields.
-	buf := make([]byte, 12)
-	binary.BigEndian.PutUint16(buf[0:2], h.ID)
-	binary.BigEndian.PutUint16(buf[2:4], h.Flags)
-	binary.BigEndian.PutUint16(buf[4:6], h.QuestionCount)
-	binary.BigEndian.PutUint16(buf[6:8], h.AnswerCount)
-	binary.BigEndian.PutUint16(buf[8:10], h.AuthorityCount)
-	binary.BigEndian.PutUint16(buf[10:12], h.AdditionalCount)
-	return buf
+	b := make([]byte, 12)
+	binary.BigEndian.PutUint16(b[0:2], h.ID)
+	binary.BigEndian.PutUint16(b[2:4], h.Flags)
+	binary.BigEndian.PutUint16(b[4:6], h.QuestionCount)
+	binary.BigEndian.PutUint16(b[6:8], h.AnswerCount)
+	binary.BigEndian.PutUint16(b[8:10], h.AuthorityCount)
+	binary.BigEndian.PutUint16(b[10:12], h.AdditionalCount)
+	return b
 }
 
 type DNSQuestion struct {
@@ -56,13 +56,13 @@ type DNSQuestion struct {
 
 func (q *DNSQuestion) toBytes() []byte {
 	nameSize := len(q.Name)
-	buf := make([]byte, nameSize+4) // plus 2 bytes for Type, 2 bytes for Class
+	b := make([]byte, nameSize+4) // plus 2 bytes for Type, 2 bytes for Class
 	// copy the Name bytes to the buffer
-	copy(buf[0:nameSize], q.Name)
+	copy(b[0:nameSize], q.Name)
 
-	binary.BigEndian.PutUint16((buf[nameSize : nameSize+2]), q.Type)
-	binary.BigEndian.PutUint16((buf[nameSize+2 : nameSize+4]), q.Class)
-	return buf
+	binary.BigEndian.PutUint16((b[nameSize : nameSize+2]), q.Type)
+	binary.BigEndian.PutUint16((b[nameSize+2 : nameSize+4]), q.Class)
+	return b
 }
 
 // DNS expects each label (e.g., "www" or "example") to be preceded
