@@ -18,7 +18,7 @@ const (
 const maxUint16Value = 2 ^ 16 - 1 // 65535
 const dnsPort = "53"
 
-type DNSHeader struct {
+type Header struct {
 	// ID is a 16 bit identifier for a query. A new random ID should be used for each request.
 	ID uint16
 	// Flags specifies the requested operation and a response code.
@@ -33,7 +33,7 @@ type DNSHeader struct {
 	AdditionalCount uint16
 }
 
-func (h *DNSHeader) toBytes() []byte {
+func (h *Header) toBytes() []byte {
 	// We can create a fixed-size byte slice of 12 bytes since we have six 2-byte sized fields.
 	b := make([]byte, 12)
 	binary.BigEndian.PutUint16(b[0:2], h.ID)
@@ -45,7 +45,7 @@ func (h *DNSHeader) toBytes() []byte {
 	return b
 }
 
-type DNSQuestion struct {
+type Question struct {
 	// Name is the domain name being queried, eg. example.com
 	Name []byte
 	// Type is an unsigned 16 bit integer specifying the type of the record being queried, eg. A
@@ -54,7 +54,7 @@ type DNSQuestion struct {
 	Class uint16
 }
 
-func (q *DNSQuestion) toBytes() []byte {
+func (q *Question) toBytes() []byte {
 	nameSize := len(q.Name)
 	b := make([]byte, nameSize+4) // plus 2 bytes for Type, 2 bytes for Class
 	// copy the Name bytes to the buffer
@@ -91,13 +91,13 @@ func buildQuery(domainName string, recordType uint16, useRecursion bool) []byte 
 		flags = recursionDesired
 	}
 
-	header := DNSHeader{
+	header := Header{
 		ID:            id,
 		QuestionCount: 1,
 		Flags:         flags,
 	}
 
-	question := DNSQuestion{
+	question := Question{
 		Name:  name,
 		Type:  recordType,
 		Class: classIN,
@@ -108,26 +108,26 @@ func buildQuery(domainName string, recordType uint16, useRecursion bool) []byte 
 	return buf.Bytes()
 }
 
-func sendQuery(queryBytes []byte, ip string) (DNSPacket, error) {
+func sendQuery(queryBytes []byte, ip string) (Packet, error) {
 	conn, err := net.Dial("udp", ip+":"+dnsPort)
 	if err != nil {
-		return DNSPacket{}, fmt.Errorf("error creating UDP connection: %v", err)
+		return Packet{}, fmt.Errorf("error creating UDP connection: %v", err)
 	}
 	defer conn.Close()
 
 	_, err = conn.Write(queryBytes)
 	if err != nil {
-		return DNSPacket{}, fmt.Errorf("error sending data: %v", err)
+		return Packet{}, fmt.Errorf("error sending data: %v", err)
 	}
 
 	resp := make([]byte, 1024)
 	_, err = conn.Read(resp)
 	if err != nil {
-		return DNSPacket{}, fmt.Errorf("error receiving response: %v", err)
+		return Packet{}, fmt.Errorf("error receiving response: %v", err)
 	}
-	packet, err := parseDNSPacket(resp)
+	packet, err := parsePacket(resp)
 	if err != nil {
-		return DNSPacket{}, fmt.Errorf("error parsing DNS packet: %v", err)
+		return Packet{}, fmt.Errorf("error parsing DNS packet: %v", err)
 	}
 	return packet, nil
 }
